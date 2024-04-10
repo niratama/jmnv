@@ -12,10 +12,10 @@ use promkit::text_editor;
 mod jnv;
 use jnv::Jnv;
 
-/// JSON navigator and interactive filter leveraging jq
+/// JSON navigator and interactive filter leveraging JMESPath
 #[derive(Parser)]
 #[command(
-    name = "jnv",
+    name = "jmnv",
     version,
     help_template = "
 {about}

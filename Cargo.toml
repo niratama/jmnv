@@ -1,10 +1,10 @@
 [package]
-name = "jnv"
+name = "jmnv"
 version = "0.2.1"
-authors = ["ynqa <un.pensiero.vano@gmail.com>"]
+authors = ["ynqa <un.pensiero.vano@gmail.com>", "Kenichi KOBAYASHI <niratma3@gmail.com>"]
 edition = "2021"
-description = "JSON navigator and interactive filter leveraging jq"
-repository = "https://github.com/ynqa/jnv"
+description = "JSON navigator and interactive filter leveraging JMESPath"
+repository = "https://github.com/niratama/jmnv"
 license = "MIT"
 readme = "README.md"
 
@@ -15,6 +15,7 @@ gag = "1.0.0"
 j9 = "0.1.3"
 promkit = "0.3.3"
 radix_trie = "0.2.1"
+jmespath = "0.3.0"
 
 # The profile that 'cargo dist' will build with
 [profile.dist]

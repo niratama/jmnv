@@ -18,6 +18,8 @@ use promkit::{
     text, text_editor, Prompt, PromptSignal, Renderer,
 };
 
+use jmespath;
+
 mod keymap;
 mod render;
 mod trie;
@@ -52,13 +54,23 @@ impl Jnv {
             .filter_map(|kind| kind.path())
             .map(|segments| {
                 if segments.is_empty() {
-                    ".".to_string()
+                    // JMESPath doesn't support root paths.
+                    // ".".to_string()
+                    "".to_string()
                 } else {
                     segments
                         .iter()
                         .enumerate()
                         .map(|(i, segment)| match segment {
                             JsonPathSegment::Key(key) => {
+                                // JMESPath doesn't support root paths.
+                                if i == 0 {
+                                    if key.contains('.') || key.contains('-') || key.contains('@') {
+                                        format!("\"{}\"", key)
+                                    } else {
+                                        format!("{}", key)
+                                    }
+                                } else
                                 if key.contains('.') || key.contains('-') || key.contains('@') {
                                     format!(".\"{}\"", key)
                                 } else {
@@ -66,11 +78,13 @@ impl Jnv {
                                 }
                             }
                             JsonPathSegment::Index(index) => {
-                                if i == 0 {
-                                    format!(".[{}]", index)
-                                } else {
-                                    format!("[{}]", index)
-                                }
+                                // JMESPath doesn't support root paths.
+                                // if i == 0 {
+                                //     format!(".[{}]", index)
+                                // } else {
+                                //     format!("[{}]", index)
+                                // }
+                                format!("[{}]", index)
                             }
                         })
                         .collect::<String>()
@@ -202,25 +216,52 @@ impl Jnv {
 
             let mut flatten_ret = Vec::<String>::new();
             for v in &self.input_json_stream {
-                let inner_ret: Vec<String> = match j9::run(&completed, &v.to_string()) {
-                    Ok(ret) => ret,
-                    Err(_e) => {
-                        self.update_hint_message(
-                            renderer,
-                            format!("Failed to execute jq query '{}'", &completed),
-                            StyleBuilder::new()
-                                .fgc(Color::Red)
-                                .attrs(Attributes::from(Attribute::Bold))
-                                .build(),
-                        );
-                        if let Some(searched) = trie.borrow().prefix_search_value(&completed) {
-                            renderer.json_snapshot.after_mut().stream =
-                                JsonStream::new(searched.clone(), self.expand_depth);
+                // let inner_ret: Vec<String> = match j9::run(&completed, &v.to_string()) {
+                //     Ok(ret) => ret,
+                //     Err(_e) => {
+                //         self.update_hint_message(
+                //             renderer,
+                //             format!("Failed to execute jq query '{}'", &completed),
+                //             StyleBuilder::new()
+                //                 .fgc(Color::Red)
+                //                 .attrs(Attributes::from(Attribute::Bold))
+                //                 .build(),
+                //         );
+                //         if let Some(searched) = trie.borrow().prefix_search_value(&completed) {
+                //             renderer.json_snapshot.after_mut().stream =
+                //                 JsonStream::new(searched.clone(), self.expand_depth);
+                //         }
+                //         return Ok(signal);
+                //     }
+                // };
+                // flatten_ret.extend(inner_ret);
+                if completed.is_empty() {
+                    // No query, just flatten the JSON
+                    flatten_ret.push(v.to_string());
+                } else {
+                    let expr = match jmespath::compile(&completed) {
+                        Ok(expr) => expr,
+                        Err(_e) => {
+                            self.update_hint_message(
+                                renderer,
+                                format!("Failed to compile JMESPath query '{}'", &completed),
+                                StyleBuilder::new()
+                                    .fgc(Color::Red)
+                                    .attrs(Attributes::from(Attribute::Bold))
+                                    .build(),
+                            );
+                            if let Some(searched) = trie.borrow().prefix_search_value(&completed) {
+                                renderer.json_snapshot.after_mut().stream =
+                                    JsonStream::new(searched.clone(), self.expand_depth);
+                            }
+                            return Ok(signal);
                         }
-                        return Ok(signal);
-                    }
-                };
-                flatten_ret.extend(inner_ret);
+                    };
+                    let json_str = v.to_string();
+                    let data = jmespath::Variable::from_json(&json_str).unwrap();
+                    let result = expr.search(data).unwrap();
+                    flatten_ret.push(result.to_string());
+                }
             }
             drop(ignore_err);
 
